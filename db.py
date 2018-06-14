@@ -1,28 +1,52 @@
+import types
+
+#package
 import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 
+import chess
+
+#local
+from svgboard import SvgBoard
 
 class Connection:
-    conn_string = "host='localhost' dbname='chess' user='www-data' password='NULL'"
+    conn_string = "host='localhost' dbname='chess' user='{}' password='NULL'"
     conn = None
 
     @classmethod
-    def connect(cls):
-        cls.conn = psycopg2.connect(cls.conn_string)
+    def commit(cls):
+        cls.conn.commit()
+
+    @classmethod
+    def connect(cls, user, disable_adapters=False):
+        cls.conn = psycopg2.connect(cls.conn_string.format(user))
+        if not disable_adapters:
+            cls.register_type("square", db_to_square)
+            cls.register_type("cpiece", db_to_cpiece)
+            cls.register_type("board", db_to_board)
+            cls.register_type("piecesquare", db_to_piecesquare)
+            cls.register_type("rank", db_to_rank)
+            cls.register_type("cfile", db_to_cfile)
 
     @classmethod
     def cursor(cls):
+        if cls.conn is None:
+            raise ValueError("not connected")
         return cls.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     @classmethod
     def execute(cls, query, *params):
+        if cls.conn is None:
+            raise ValueError("not connected")
         cursor = cls.cursor()
         cursor.execute(query, params)
         return cursor.rowcount, cursor
 
     @classmethod
     def get_type_oid(cls, name):
+        if cls.conn is None:
+            raise ValueError("not connected")
         n, curs = cls.execute('select oid from pg_type where typname = %s', name)
         if n==0:
             raise ValueError("could not find type {}".format(name))
@@ -30,6 +54,8 @@ class Connection:
 
     @classmethod
     def register_type(cls, name, func):
+        if cls.conn is None:
+            raise ValueError("not connected")
         oids = (Connection.get_type_oid(name),) 
         f = psycopg2.extensions.new_type(oids, name, func)
         psycopg2.extensions.register_type(f)
@@ -37,7 +63,6 @@ class Connection:
         f = psycopg2.extensions.new_array_type(oids, "_"+name, f)
         psycopg2.extensions.register_type(f)
 
-Connection.connect()
 
 class PieceSquare:
     def __init__(self, val):
@@ -70,19 +95,26 @@ class PieceSquareSubject:
     def __repr__(self):
         return self.__str__()
     
+def db_to_cfile(val, curs):
+    return val
 
+def db_to_rank(val, curs):
+    return val
 
 def db_to_square(val, curs):
     return chess.SQUARE_NAMES.index(val)
-Connection.register_type("square", db_to_square)
 
 def db_to_cpiece(val, curs):
     return chess.Piece.from_symbol(val)
-Connection.register_type("cpiece", db_to_cpiece)
 
 def db_to_board(val, curs):
-    return chess.Board(val + ' 1 1')
-Connection.register_type("board", db_to_board)
+    if not val:
+        return
+    if len(val.split()) != 6:
+        val = val + ' 0 0'
+    board = chess.Board(val)
+    board.to_svg = types.MethodType(to_svg, board)
+    return board
 
 def db_to_piecesquare(val, curs):
     if val[0] == '+':
@@ -92,34 +124,38 @@ def db_to_piecesquare(val, curs):
             return PieceSquareSubject(val)
     return PieceSquare(val)
 
-Connection.register_type("piecesquare", db_to_piecesquare)
+def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=False, href=None):
+    svg = SvgBoard(size=size, labels=labels)
+    for (square, piece) in iter_piecesquares(board):
+        svg.add_piece(square, piece)
+        if comp and comp.piece_at(square) == piece:
+            svg.add_circle(square)
+
+    if comp:
+        for (square, piece) in iter_piecesquares(comp):
+            if board.piece_at(square) != piece:
+                svg.add_circle(square, stroke='red')
+
+    if legend:
+        svg.add_legend()
+    if fen:
+        svg.add_caption("{}".format(board.fen()))
+    if title:
+        svg.add_title("{}".format(title), href=href)
+
+    return svg
+
+def iter_piecesquares(board):
+    for i in range(64):
+        bb = (56 - (i//8)*8 + (i%8)) #fen order
+        p = board.piece_at(bb)
+        if p:
+            yield bb, p
 
 
-class Query(Connection):
+if __name__ == '__main__':
 
-    @classmethod
-    def random_search(cls):
-        c = Connection.cursor()
-        n, rows = cls.execute(c, "select * from random_search()")
-        for row in rows:
-            yield PositionResult(row)
-
-    @classmethod
-    def random_position(cls):
-        c = Connection.cursor()
-        n, rows = cls.execute(c, "select * from v_position order by random() limit 1")
-        if n == 0:
-            return None
-        for row in rows:
-            return Position(row)
-
-    @classmethod
-    def select_fen(cls, fen):
-
-        c = Connection.cursor()
-        n, rows = cls.execute(c, "select * from v_position where fen=%s limit 1", fen)
-        if n == 0:
-            return None
-        return Position(rows.fetchone())
-
+    Connection.connect('www-data')
+    n, rows = Connection.execute("select pawn_max_ranks(start_board())")
+    print(rows.fetchone()[0])
 
