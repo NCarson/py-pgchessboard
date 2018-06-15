@@ -1,4 +1,6 @@
 import types
+import time
+import sys
 
 #package
 import psycopg2
@@ -7,8 +9,24 @@ import psycopg2.extensions
 
 import chess
 
+if __name__ == '__main__':
+    sys.path.append('..')
+
 #local
-from svgboard import SvgBoard
+from py_pgchessboard.svgboard import SvgBoard
+
+def timeit(f):
+
+    def timed(*args, **kw):
+
+        ts = time.time()
+        result = f(*args, **kw)
+        te = time.time()
+
+        sys.stderr.write('func:%r args:[%r, %r] took: %2.4f sec\n' % \
+          (f.__name__, args, kw, te-ts))
+        return result
+    return timed
 
 class Connection:
     conn_string = "host='localhost' dbname='chess' user='{}' password='NULL'"
@@ -108,6 +126,7 @@ def db_to_cpiece(val, curs):
     return chess.Piece.from_symbol(val)
 
 def db_to_board(val, curs):
+
     if not val:
         return
     if len(val.split()) != 6:
@@ -156,6 +175,11 @@ def iter_piecesquares(board):
 if __name__ == '__main__':
 
     Connection.connect('www-data')
-    n, rows = Connection.execute("select pawn_max_ranks(start_board())")
-    print(rows.fetchone()[0])
+    @timeit
+    def time_board():
+        n, rows = Connection.execute("select 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'::board from generate_series(1,1000)")
+        for r in rows:
+            (rows.fetchone()[0])
+
+    time_board()
 
