@@ -9,13 +9,11 @@ import psycopg2.extensions
 
 import chess
 
-if __name__ == '__main__':
-    sys.path.append('..')
-
 #local
-from py_pgchessboard.svgboard import SvgBoard
+from svgboard import SvgBoard
+from newsvg import ChessBoardSvg
 
-def timeit(f):
+def timit(f):
 
     def timed(*args, **kw):
 
@@ -143,6 +141,8 @@ def db_to_piecesquare(val, curs):
             return PieceSquareSubject(val)
     return PieceSquare(val)
 
+
+@timit
 def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=False, href=None):
     svg = SvgBoard(size=size, labels=labels)
     for (square, piece) in iter_piecesquares(board):
@@ -162,7 +162,12 @@ def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=Fal
     if title:
         svg.add_title("{}".format(title), href=href)
 
-    return svg
+    return svg.tostring()
+
+@timit
+def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=False, href=None):
+    svg = ChessBoardSvg(board, size)
+    return svg.to_svg()
 
 def iter_piecesquares(board):
     for i in range(64):
