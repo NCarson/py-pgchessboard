@@ -167,7 +167,7 @@ def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=Fal
 @timit
 def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=False, href=None):
     svg = ChessBoardSvg(board, size)
-    return svg.to_svg()
+    return svg.to_svg(comp=comp)
 
 def iter_piecesquares(board):
     for i in range(64):

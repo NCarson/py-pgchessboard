@@ -1,4 +1,6 @@
 
+import chess
+
 def to_bb_idx(i):
     #from chess square idx, i.ie 1st quadrant math
     return (56 - (i//8)*8 + (i%8))
@@ -26,7 +28,9 @@ class ChessBoardSvg:
     </g>
     '''
     piece_svg = '<use transform="translate({},{})" xlink:href="#{}" />'
-    caption_svg = '<g class="caption"><text x="0" y="69">{}</text></g>'
+    caption_svg = '''<g class="caption"><text x="0" y="69">{}</text></g>'''
+    circle_svg = '<circle cx="{}" cy="{}" r="{}" stroke="{}" stroke-width="{}" fill="{}"/>'
+
 
     piece_names = {
             'P':'white-pawn', 'N':'white-knight', 'B':'white-bishop', 'R':'white-rook', 'Q':'white-queen', 'K':'white-king',
@@ -48,16 +52,33 @@ class ChessBoardSvg:
         x, y = xc*7+4, yc*7+2,
         return self.piece_svg.format(x, y, name)
 
-    def to_svg(self):
+    def add_circle(self, square, stroke='black'):
+        name = '{}-circle'.format(chess.SQUARE_NAMES[square])
+        xc, yc = self._square_offset(square)
+        return self.circle_svg.format(xc*7+4*7, yc*7+4*7, 3.5*7, stroke, 3, 'none')
+
+    def to_svg(self, comp=None):
         out = self.svg.format(self.size, self.size)
         out += self.header
         out += '<g class="pieces" transform="scale(0.143)">\n'
         for square, piece in self.board.piece_map().items():
             out += self._piece(square, piece) + '\n'
+            if comp and comp.piece_at(square) != piece:
+                out += self.add_circle(square, 'red')
+            if comp and comp.piece_at(square) == piece:
+                out += self.add_circle(square, 'blue')
+
+        if comp:
+            for square, piece in comp.piece_map().items():
+                if self.board.piece_at(square) != piece:
+                    out += self.add_circle(square, 'red')
+
         out += '</g>'
         out += self.caption_svg.format(self.board.fen()) + '\n'
         out += '</svg>'
         return out
+
+        #svg.add_circle(square, stroke='orange')
 
 
 if __name__ == '__main__':
