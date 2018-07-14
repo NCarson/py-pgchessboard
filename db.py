@@ -31,12 +31,21 @@ class Connection:
     conn = None
 
     @classmethod
+    def register_alchemy(cls, engine):
+        conn = engine.raw_connection().connection
+        cls.connect(None, conn=conn)
+
+    @classmethod
     def commit(cls):
         cls.conn.commit()
 
     @classmethod
-    def connect(cls, user, disable_adapters=False):
-        cls.conn = psycopg2.connect(cls.conn_string.format(user))
+    def connect(cls, user, disable_adapters=False, conn=None):
+        if not conn:
+            cls.conn = psycopg2.connect(cls.conn_string.format(user))
+        else:
+            cls.conn = conn
+
         if not disable_adapters:
             cls.register_type("square", db_to_square)
             cls.register_type("cpiece", db_to_cpiece)
@@ -142,7 +151,6 @@ def db_to_piecesquare(val, curs):
     return PieceSquare(val)
 
 
-@timit
 def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=False, href=None):
     svg = SvgBoard(size=size, labels=labels)
     for (square, piece) in iter_piecesquares(board):
@@ -164,7 +172,6 @@ def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=Fal
 
     return svg.tostring()
 
-@timit
 def to_svg(board, size, comp=None, title=None, legend=True, fen=True, labels=False, href=None):
     svg = ChessBoardSvg(board, size)
     return svg.to_svg(comp=comp)
