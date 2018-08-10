@@ -27,32 +27,46 @@ def timit(f):
     return timed
 
 class Connection:
-    conn_string = "host='localhost' dbname='chess' user='{}' password='NULL'"
+    conn_string = "host='{}' dbname='{}' user='{}' password='{}'"
     conn = None
 
     @classmethod
-    def register_alchemy(cls, engine):
-        conn = engine.raw_connection().connection
-        cls.connect(None, conn=conn)
+    def register_alchemy(cls, engine, user, dbname, host='localhost', password='NULL'):
+        cls.conn = engine.raw_connection().connection
+        cls._register_adapters()
+
+    @classmethod
+    def register_orm(cls, conn):
+        cls.conn = conn
+        cls._register_adapters()
 
     @classmethod
     def commit(cls):
         cls.conn.commit()
 
     @classmethod
-    def connect(cls, user, disable_adapters=False, conn=None):
+    def connect(cls, user, dbname,
+            host='localhost', password=None,
+            disable_adapters=False, conn=None):
         if not conn:
-            cls.conn = psycopg2.connect(cls.conn_string.format(user))
+            s = cls.conn_string.format(host, dbname, user, password)
+            if password:
+                s + " password='{}'".format(password)
+            cls.conn = psycopg2.connect(s)
         else:
             cls.conn = conn
 
         if not disable_adapters:
-            cls.register_type("square", db_to_square)
-            cls.register_type("cpiece", db_to_cpiece)
-            cls.register_type("board", db_to_board)
-            cls.register_type("piecesquare", db_to_piecesquare)
-            cls.register_type("rank", db_to_rank)
-            cls.register_type("cfile", db_to_cfile)
+            cls._register_adapters()
+
+    @classmethod
+    def _register_adapters(cls):
+        cls.register_type("square", db_to_square)
+        cls.register_type("cpiece", db_to_cpiece)
+        cls.register_type("board", db_to_board)
+        cls.register_type("piecesquare", db_to_piecesquare)
+        cls.register_type("rank", db_to_rank)
+        cls.register_type("cfile", db_to_cfile)
 
     @classmethod
     def cursor(cls):

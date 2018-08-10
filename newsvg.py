@@ -46,10 +46,14 @@ class ChessBoardSvg:
         x, y = i%8, i//8
         return x*8, y*8
 
-    def _piece(self, square, piece):
+    def get_piece_args(self, square, piece):
         name = self.piece_names[str(piece)]
         xc, yc = self._square_offset(square)
         x, y = xc*7+4, yc*7+2,
+        return (x, y, name)
+
+    def _piece(self, square, piece):
+        x, y, name = self.get_piece_args(square, piece)
         return self.piece_svg.format(x, y, name)
 
     def add_circle(self, square, stroke='black'):
